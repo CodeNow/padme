@@ -1,117 +1,108 @@
 'use strict'
 require('loadenv')()
-
-const Lab = require('lab')
-const lab = exports.lab = Lab.script()
-const describe = lab.describe
-const it = lab.it
-const afterEach = lab.afterEach
-const beforeEach = lab.beforeEach
 const Code = require('code')
-const expect = Code.expect
-
-const Hermes = require('runnable-hermes')
-const Promise = require('bluebird')
+const Lab = require('lab')
+const RabbitConnector = require('ponos/lib/rabbitmq')
 const sinon = require('sinon')
+const Promise = require('bluebird')
 
+const publishedEventList = require('../../../lib/external/published-event-list.js')
 const publisher = require('../../../lib/external/publisher.js')
 
-describe('publisher.js unit test', function () {
-  beforeEach(function (done) {
-    process.env.RABBITMQ_HOSTNAME = 'Goblins'
-    process.env.RABBITMQ_PASSWORD = 'Orcs'
-    process.env.RABBITMQ_PORT = '1738'
-    process.env.RABBITMQ_USERNAME = 'Azog'
-    done()
-  })
+require('sinon-as-promised')(Promise)
+const lab = exports.lab = Lab.script()
 
-  afterEach(function (done) {
-    delete process.env.RABBITMQ_HOSTNAME
-    delete process.env.RABBITMQ_PASSWORD
-    delete process.env.RABBITMQ_PORT
-    delete process.env.RABBITMQ_USERNAME
-    done()
-  })
+const afterEach = lab.afterEach
+const beforeEach = lab.beforeEach
+const describe = lab.describe
+const expect = Code.expect
+const it = lab.it
 
-  describe('constructor', function () {
-    it('should _publisher', function (done) {
-      expect(publisher._publisher).to.be.an.instanceOf(Hermes)
-      done()
-    })
-  }) // end constructor
-
-  describe('start', function () {
-    beforeEach(function (done) {
-      sinon.stub(publisher._publisher, 'connectAsync')
+describe('publisher.js unit test', () => {
+  describe('start', () => {
+    beforeEach((done) => {
+      sinon.stub(RabbitConnector.prototype, 'connect')
       done()
     })
 
-    afterEach(function (done) {
-      publisher._publisher.connectAsync.restore()
+    afterEach((done) => {
+      RabbitConnector.prototype.connect.restore()
       done()
     })
 
-    it('should run connect', function (done) {
-      publisher._publisher.connectAsync.returns(Promise.resolve())
+    it('should run connect', (done) => {
+      RabbitConnector.prototype.connect.resolves()
 
       publisher.start().asCallback(() => {
-        sinon.assert.calledOnce(publisher._publisher.connectAsync)
+        sinon.assert.calledOnce(RabbitConnector.prototype.connect)
+        done()
+      })
+    })
+
+    it('should have populated task list correctly', (done) => {
+      RabbitConnector.prototype.connect.resolves()
+
+      publisher.start().asCallback(() => {
+        expect(publisher._publisher.tasks).to.be.an.array()
+        publisher._publisher.tasks.forEach((item) => {
+          expect(item).to.contain(['name', 'jobSchema'])
+        })
+
+        done()
+      })
+    })
+
+    it('should have populated event list correctly', (done) => {
+      RabbitConnector.prototype.connect.resolves()
+
+      publisher.start().asCallback(() => {
+        expect(publisher._publisher.events).to.equal(publishedEventList)
         done()
       })
     })
   }) // end start
 
-  describe('publishEventTested', function () {
-    beforeEach(function (done) {
-      sinon.stub(publisher._publisher, 'publish')
+  describe('publishEvent', () => {
+    const testEvent = 'test.event'
+    const testData = { msg: 'data' }
+
+    beforeEach((done) => {
+      sinon.stub(RabbitConnector.prototype, 'publishEvent')
       done()
     })
 
-    afterEach(function (done) {
-      publisher._publisher.publish.restore()
+    afterEach((done) => {
+      RabbitConnector.prototype.publishEvent.restore()
       done()
     })
 
-    it('should throw for invalid data', function (done) {
-      expect(() => {
-        publisher.publishEventTested({})
-      }).to.throw()
+    it('should call publishEvent', (done) => {
+      publisher.publishEvent(testEvent, testData)
+      sinon.assert.calledOnce(RabbitConnector.prototype.publishEvent)
+      sinon.assert.calledWith(RabbitConnector.prototype.publishEvent, testEvent, testData)
+      done()
+    })
+  }) // end publishEvent
+
+  describe('publishTask', () => {
+    const testTask = 'test.task'
+    const testData = { msg: 'data' }
+
+    beforeEach((done) => {
+      sinon.stub(RabbitConnector.prototype, 'publishTask')
       done()
     })
 
-    it('should call publish', function (done) {
-      var testData = { id: 'data' }
-      publisher.publishEventTested(testData)
-      sinon.assert.calledOnce(publisher._publisher.publish)
-      sinon.assert.calledWith(publisher._publisher.publish, 'event.tested', testData)
-      done()
-    })
-  }) // end publishEventTested
-
-  describe('publishQueueTest', function () {
-    beforeEach(function (done) {
-      sinon.stub(publisher._publisher, 'publish')
+    afterEach((done) => {
+      RabbitConnector.prototype.publishTask.restore()
       done()
     })
 
-    afterEach(function (done) {
-      publisher._publisher.publish.restore()
+    it('should call publishTask', (done) => {
+      publisher.publishTask(testTask, testData)
+      sinon.assert.calledOnce(RabbitConnector.prototype.publishTask)
+      sinon.assert.calledWith(RabbitConnector.prototype.publishTask, testTask, testData)
       done()
     })
-
-    it('should throw for invalid data', function (done) {
-      expect(() => {
-        publisher.publishQueueTest({})
-      }).to.throw()
-      done()
-    })
-
-    it('should call publish', function (done) {
-      var testData = { msg: 'data' }
-      publisher.publishQueueTest(testData)
-      sinon.assert.calledOnce(publisher._publisher.publish)
-      sinon.assert.calledWith(publisher._publisher.publish, 'queue.test', testData)
-      done()
-    })
-  }) // end publishQueueTest
+  }) // end publishTask
 }) // end publisher.js unit test

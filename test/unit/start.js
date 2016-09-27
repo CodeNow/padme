@@ -1,158 +1,67 @@
-'use strict';
+'use strict'
+const ErrorCat = require('error-cat')
+const Lab = require('lab')
+const Promise = require('bluebird')
+const sinon = require('sinon')
 
-var Lab = require('lab');
-var lab = exports.lab = Lab.script();
-var describe = lab.describe;
-var it = lab.it;
-var afterEach = lab.afterEach;
-var beforeEach = lab.beforeEach;
-var Code = require('code');
-var expect = Code.expect;
+const publisher = require('../../lib/external/publisher.js')
+const start = require('../../lib/start.js')
+const workerServer = require('../../lib/external/worker-server.js')
 
-var sinon = require('sinon');
+require('sinon-as-promised')(Promise)
+const lab = exports.lab = Lab.script()
 
-var Docker = require('../../lib/models/docker.js');
-var RabbitMQ = require('../../lib/models/rabbitmq.js');
-var Start = require('../../lib/start.js');
-var WorkerServer = require('../../lib/models/worker-server.js');
+const afterEach = lab.afterEach
+const beforeEach = lab.beforeEach
+const describe = lab.describe
+const it = lab.it
 
-describe('start.js unit test', function () {
-  describe('startup', function () {
-    beforeEach(function (done) {
-      sinon.stub(WorkerServer, 'listen');
-      sinon.stub(RabbitMQ, 'publishWeaveStart');
-      sinon.stub(Docker, 'info');
-      done();
-    });
+describe('start.js unit test', () => {
+  describe('flow', () => {
+    beforeEach((done) => {
+      sinon.stub(publisher, 'start')
+      sinon.stub(workerServer, 'start')
+      sinon.stub(ErrorCat, 'report')
+      sinon.stub(process, 'exit')
+      done()
+    })
 
-    afterEach(function (done) {
-      WorkerServer.listen.restore();
-      RabbitMQ.publishWeaveStart.restore();
-      Docker.info.restore();
-      done();
-    });
+    afterEach((done) => {
+      publisher.start.restore()
+      workerServer.start.restore()
+      ErrorCat.report.restore()
+      process.exit.restore()
+      done()
+    })
 
-    it('should startup on add docks', function (done) {
-      var peers = [{
-        dockerHost: '10.0.0.1:4242',
-        Labels: [{ name: 'size', value: 'large' }, { name: 'org', value: 'codenow' }]
-      }, {
-        dockerHost: '10.0.0.2:4242',
-        Labels: [{ name: 'size', value: 'large' }, { name: 'org', value: 'other' }]
-      }];
-      RabbitMQ.publishWeaveStart.returns();
-      WorkerServer.listen.yieldsAsync();
-      Docker.info.yieldsAsync(null, peers);
+    it('should start publisher and server', (done) => {
+      publisher.start.resolves()
+      workerServer.start.resolves()
 
-      Start.startup(function (err) {
+      start().asCallback((err) => {
         if (err) { return done(err) }
+        sinon.assert.callOrder(
+          publisher.start,
+          workerServer.start
+        )
+        sinon.assert.notCalled(process.exit)
+        sinon.assert.notCalled(ErrorCat.report)
+        done()
+      })
+    })
 
-        sinon.assert.calledTwice(RabbitMQ.publishWeaveStart)
-        sinon.assert.calledWith(RabbitMQ.publishWeaveStart, {
-          dockerUri: 'http://10.0.0.2:4242',
-          orgId: 'other'
-        })
-        sinon.assert.calledWith(RabbitMQ.publishWeaveStart, {
-          dockerUri: 'http://10.0.0.1:4242',
-          orgId: 'codenow'
-        })
-        expect(WorkerServer.listen.calledOnce).to.be.true();
-        done();
-      });
-    });
+    it('should report and exit on error', (done) => {
+      publisher.start.rejects(new Error('death star'))
 
-    it('should throw an error if `Docker.info` throws an error', function (done) {
-      RabbitMQ.publishWeaveStart.returns();
-      WorkerServer.listen.yieldsAsync();
-      Docker.info.yieldsAsync('err');
+      start().asCallback((err) => {
+        if (err) { return done(err) }
+        sinon.assert.callOrder(
+          ErrorCat.report,
+          process.exit
+        )
 
-      Start.startup(function (err) {
-        expect(err).to.exist();
-        expect(RabbitMQ.publishWeaveStart.called).to.be.false();
-        done();
-      });
-    });
-
-    it('should throw an error if `WorkerServer.listen` throws an error', function (done) {
-      WorkerServer.listen.yieldsAsync('err');
-
-      Start.startup(function (err) {
-        expect(err).to.exist();
-        expect(RabbitMQ.publishWeaveStart.called).to.be.false();
-        done();
-      });
-    });
-
-    it('should throw an error if `RabbitMQ.publishWeaveStart` throws an error', function (done) {
-      var peers = [{
-        dockerHost: '10.0.0.1:4242',
-        Labels: [{ name: 'size', value: 'large' }, { name: 'org', value: 'codenow' }]
-      }, {
-        dockerHost: '10.0.0.2:4242',
-        Labels: [{ name: 'size', value: 'large' }, { name: 'org', value: 'other' }]
-      }];
-      RabbitMQ.publishWeaveStart.throws();
-      WorkerServer.listen.yieldsAsync();
-      Docker.info.yieldsAsync(null, peers);
-
-      Start.startup(function (err) {
-        expect(err).to.exist();
-        sinon.assert.calledOnce(WorkerServer.listen);
-        sinon.assert.calledOnce(Docker.info);
-        sinon.assert.calledOnce(RabbitMQ.publishWeaveStart);
-        done();
-      });
-    });
-
-  }); // end startup
-
-  describe('shutdown', function () {
-    beforeEach(function (done) {
-      sinon.stub(WorkerServer, 'stop');
-      sinon.stub(RabbitMQ, 'disconnectPublisher');
-      done();
-    });
-
-    afterEach(function (done) {
-      WorkerServer.stop.restore();
-      RabbitMQ.disconnectPublisher.restore();
-      done();
-    });
-
-    it('should shutdown all services', function (done) {
-      WorkerServer.stop.yieldsAsync();
-      RabbitMQ.disconnectPublisher.yieldsAsync();
-
-      Start.shutdown(function (err) {
-        expect(err).to.not.exist();
-        expect(WorkerServer.stop.calledOnce).to.be.true();
-        expect(RabbitMQ.disconnectPublisher.calledOnce).to.be.true();
-        done();
-      });
-    });
-
-    it('should throw an error if `WorkerServer` failed', function (done) {
-      var errMessage = 'WorkerServer error';
-      WorkerServer.stop.yieldsAsync(new Error(errMessage));
-
-      Start.shutdown(function (err) {
-        expect(err).to.exist();
-        expect(err).to.be.an.instanceof(Error);
-        expect(err.message).to.equal(errMessage);
-        done();
-      });
-    });
-
-    it('should throw an error if `RabbitMQ.disconnectPublisher` failed', function (done) {
-      var errMessage = 'RabbitMQ.disconnectPublisher error';
-      WorkerServer.stop.yieldsAsync();
-      RabbitMQ.disconnectPublisher.yieldsAsync(new Error(errMessage));
-
-      Start.shutdown(function (err) {
-        expect(err).to.be.an.instanceof(Error);
-        expect(err.message).to.equal(errMessage);
-        done();
-      });
-    });
-  }); // end shutdown
-}); // end start.js unit test
+        done()
+      })
+    })
+  }) // end flow
+}) // end start.js unit test
