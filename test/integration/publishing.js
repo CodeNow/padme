@@ -41,16 +41,15 @@ describe('rabbitmq integration test', () => {
   beforeEach((done) => {
     publisher.start()
       .then(() => {
-        testSubscriber.start()
+        return testSubscriber.start()
       })
       .asCallback(done)
   })
 
   afterEach((done) => {
     publisher._publisher.disconnect()
-      // .delay(1000)
       .then(() => {
-        testSubscriber.stop()
+        return testSubscriber.stop()
       })
       .asCallback(done)
   })
