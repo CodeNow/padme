@@ -14,10 +14,6 @@
     "type": "git",
     "url": "git://github.com/codenow/padme"
   },
-  "keywords": [
-    "networking",
-    "runnable"
-  ],
   "author": "anandkumarpatel",
   "license": "MIT",
   "bugs": {
