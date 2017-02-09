@@ -1,6 +1,6 @@
 {
   "name": "padme",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Padme is a template worker server for Runnable.",
   "main": "index.js",
   "directories": {
