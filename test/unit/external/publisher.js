@@ -43,8 +43,8 @@ describe('publisher.js unit test', () => {
       RabbitConnector.prototype.connect.resolves()
 
       publisher.start().asCallback(() => {
-        expect(publisher._publisher.tasks).to.be.an.array()
-        publisher._publisher.tasks.forEach((item) => {
+        expect(publisher.tasks).to.be.an.array()
+        publisher.tasks.forEach((item) => {
           expect(item).to.contain(['name', 'jobSchema'])
         })
 
@@ -56,7 +56,7 @@ describe('publisher.js unit test', () => {
       RabbitConnector.prototype.connect.resolves()
 
       publisher.start().asCallback(() => {
-        expect(publisher._publisher.events).to.equal(publishedEventList)
+        expect(publisher.events).to.equal(publishedEventList)
         done()
       })
     })

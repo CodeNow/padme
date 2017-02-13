@@ -1,6 +1,5 @@
 'use strict'
 require('loadenv')()
-
 const Code = require('code')
 const Lab = require('lab')
 const PonosServer = require('ponos').Server
@@ -47,7 +46,7 @@ describe('rabbitmq integration test', () => {
   })
 
   afterEach((done) => {
-    publisher._publisher.disconnect()
+    publisher.disconnect()
       .then(() => {
         return testSubscriber.stop()
       })

@@ -5,12 +5,11 @@ const monitorDog = require('monitor-dog')
 const Promise = require('bluebird')
 const sinon = require('sinon')
 
-const workerDef = require('workers/event.received.js')
+const Worker = require('workers/event.received.js')
 const publisher = require('external/publisher.js')
 
 require('sinon-as-promised')(Promise)
 const lab = exports.lab = Lab.script()
-const Worker = workerDef._Worker
 
 const afterEach = lab.afterEach
 const beforeEach = lab.beforeEach
@@ -27,24 +26,6 @@ describe('event.received worker unit test', () => {
     }
     done()
   })
-
-  describe('workerDef', () => {
-    beforeEach((done) => {
-      sinon.stub(workerDef._Worker.prototype, 'run')
-      done()
-    })
-
-    afterEach((done) => {
-      workerDef._Worker.prototype.run.restore()
-      done()
-    })
-
-    it('should call run', (done) => {
-      workerDef.task()
-      sinon.assert.calledOnce(workerDef._Worker.prototype.run)
-      done()
-    })
-  }) // end workerDef
 
   describe('constructor', () => {
     it('should set job and logger', (done) => {
