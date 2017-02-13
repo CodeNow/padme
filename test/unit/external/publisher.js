@@ -6,7 +6,7 @@ const RabbitConnector = require('ponos/lib/rabbitmq')
 const sinon = require('sinon')
 const Promise = require('bluebird')
 
-const publishedEventList = require('../../../lib/external/published-event-list.js')
+const publishedEventList = require('../../../lib/external/published-events.js')
 const publisher = require('../../../lib/external/publisher.js')
 
 require('sinon-as-promised')(Promise)
